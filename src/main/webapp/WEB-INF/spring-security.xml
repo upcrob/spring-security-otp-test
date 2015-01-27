@@ -1,0 +1,93 @@
+<beans:beans xmlns="http://www.springframework.org/schema/security"
+	xmlns:beans="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+	http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+	http://www.springframework.org/schema/security
+	http://www.springframework.org/schema/security/spring-security-3.2.xsd">
+
+	<http auto-config="false" entry-point-ref="loginUrlAuthenticationEntryPoint">
+		<intercept-url pattern="/private**" access="ROLE_USER" />
+		<logout logout-success-url="/login?logout" />
+
+		<!-- Custom OTP Filter -->
+		<custom-filter ref="otpUsernamePasswordAuthFilter"
+			position="FORM_LOGIN_FILTER" />
+		
+		<!-- OTP Generation Endpoint Filter -->
+		<custom-filter ref="otpGenerationFilter"
+			before="FORM_LOGIN_FILTER" />
+	</http>
+
+	<authentication-manager alias="authenticationManager">
+		<authentication-provider>
+			<user-service>
+				<user name="testuser" password="testpassword" authorities="ROLE_USER" />
+			</user-service>
+		</authentication-provider>
+	</authentication-manager>
+
+	<!-- Spring Security Beans -->
+	<beans:bean id="loginUrlAuthenticationEntryPoint"
+		class="org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint">
+		<beans:property name="loginFormUrl" value="/login" />
+	</beans:bean>
+	<!-- End Spring Security Beans -->
+
+	<!-- Spring Security OTP -->
+	<!-- Filter checks username, password, and OTP token for validity -->
+	<beans:bean id="otpUsernamePasswordAuthFilter"
+		class="com.upcrob.springsecurity.otp.OtpAuthenticationFilter">
+		<beans:constructor-arg name="tokenStore" ref="localTokenstore" />
+		<beans:property name="authenticationManager" ref="authenticationManager" />
+		<beans:property name="usernameParameter" value="username" />
+		<beans:property name="passwordParameter" value="password" />
+	</beans:bean>
+
+	<!-- In-memory tokenstore (not for production) that stores generates tokens 
+		and treats them as valid for 60 seconds following creation -->
+	<beans:bean id="localTokenstore"
+		class="com.upcrob.springsecurity.otp.LocalTokenstore">
+		<beans:constructor-arg name="maxLifetime" value="60" />
+	</beans:bean>
+
+	<!-- Dummy implementation for looking up user email addresses. Normally, 
+		we would use JdbcLookupStrategy or LdapLookupStrategy. This helps minimize 
+		configuration for this example, but either of these other classes could be 
+		injected here instead -->
+	<beans:bean id="dummyLookupStrategy"
+		class="com.upcrob.springsecurity.example.DummyLookupStrategy">
+		<beans:property name="users" ref="userMap" />
+	</beans:bean>
+	<beans:bean id="userMap" class="org.springframework.beans.factory.config.MapFactoryBean">
+		<beans:property name="sourceMap">
+			<beans:map>
+				<beans:entry key="testuser" value="[TEST USER EMAIL]" />
+			</beans:map>
+		</beans:property>
+	</beans:bean>
+	
+	<!-- Method by which OTP tokens should be sent.  We'll use email for this
+		example.  The server, port and TLS properties are currently setup for gmail,
+		but need to be configured differently if a different provider is being used. -->
+	<beans:bean id="emailSendStrategy"
+		class="com.upcrob.springsecurity.otp.EmailSendStrategy">
+		<beans:constructor-arg name="server" value="smtp.gmail.com" />
+		<beans:constructor-arg name="port" value="587" />
+		<beans:constructor-arg name="fromAddr" value="[SENDER ACCOUNT EMAIL]" />
+		<beans:property name="useTls" value="true" />
+		<beans:property name="username" value="[SENDER ACCOUNT USERNAME]" />
+		<beans:property name="password" value="[SENDER ACCOUNT PASSWORD]" />
+	</beans:bean>
+	
+	<!-- Filter that listens for requests to send OTP tokens to users -->
+	<beans:bean id="otpGenerationFilter"
+		class="com.upcrob.springsecurity.otp.OtpGenerationFilter">
+		<beans:constructor-arg name="tokenStore" ref="localTokenstore" />
+		<beans:constructor-arg name="lookupStrategy" ref="dummyLookupStrategy" />
+		<beans:constructor-arg name="sendStrategy" ref="emailSendStrategy" />
+		<beans:constructor-arg name="endpoint" value="/generatetoken" />
+		<beans:property name="usernameParameter" value="username" />
+	</beans:bean>
+	<!-- End Spring Security OTP -->
+</beans:beans>

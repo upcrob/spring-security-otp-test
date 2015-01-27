@@ -1,0 +1,25 @@
+apply plugin: 'war'
+apply plugin: 'eclipse-wtp'
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	// otp library
+	compile files('deps/spring-security-otp-0.1.0.jar')
+	
+	// spring
+	compile 'org.springframework:spring-context:3.2.13.RELEASE'
+	compile 'org.springframework:spring-web:3.2.13.RELEASE'
+	compile 'org.springframework:spring-webmvc:3.2.13.RELEASE'
+	compile 'org.springframework.security:spring-security-config:3.2.5.RELEASE'
+	compile 'org.springframework.security:spring-security-web:3.2.5.RELEASE'
+	
+	// mail
+	runtime 'com.sun.mail:javax.mail:1.5.2'
+}
+
+task wrapper(type: Wrapper) {
+	gradleVersion = '2.2.1'
+}
