@@ -7,7 +7,7 @@ repositories {
 
 dependencies {
 	// otp library
-	compile files('deps/spring-security-otp-0.1.0.jar')
+	compile files('deps/spring-security-otp-0.3.0.jar')
 	
 	// spring
 	compile 'org.springframework:spring-context:3.2.13.RELEASE'

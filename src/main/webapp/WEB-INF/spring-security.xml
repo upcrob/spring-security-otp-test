@@ -10,21 +10,15 @@
 		<intercept-url pattern="/private**" access="ROLE_USER" />
 		<logout logout-success-url="/login?logout" />
 
-		<!-- Custom OTP Filter -->
-		<custom-filter ref="otpUsernamePasswordAuthFilter"
-			position="FORM_LOGIN_FILTER" />
+		<!-- OTP validation filter -->
+		<custom-filter ref="otpValidationFilter" before="LAST" />
 		
-		<!-- OTP Generation Endpoint Filter -->
-		<custom-filter ref="otpGenerationFilter"
-			before="FORM_LOGIN_FILTER" />
+		<!-- Form login filter -->
+		<custom-filter ref="formLoginFilter" position="FORM_LOGIN_FILTER" />
 	</http>
 
 	<authentication-manager alias="authenticationManager">
-		<authentication-provider>
-			<user-service>
-				<user name="testuser" password="testpassword" authorities="ROLE_USER" />
-			</user-service>
-		</authentication-provider>
+		<authentication-provider ref="otpGeneratingAuthenticationProvider" />
 	</authentication-manager>
 
 	<!-- Spring Security Beans -->
@@ -32,17 +26,56 @@
 		class="org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint">
 		<beans:property name="loginFormUrl" value="/login" />
 	</beans:bean>
+
+	<beans:bean id="formLoginFilter"
+		class="org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter">
+		<beans:property name="authenticationManager" ref="authenticationManager" />
+		<beans:property name="filterProcessesUrl" value="/j_spring_security_check" />
+		<beans:property name="usernameParameter" value="username" />
+		<beans:property name="passwordParameter" value="password" />
+		<beans:property name="authenticationSuccessHandler" ref="userpassSuccessHandler" />
+		<beans:property name="authenticationFailureHandler" ref="userpassFailureHandler" />
+	</beans:bean>
+	
+	<!-- If username/password authentication is successful, send user to the OTP entry page. -->
+	<beans:bean id="userpassSuccessHandler"
+			class="org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler">
+		<beans:constructor-arg value="/otpentry" />
+	</beans:bean>
+	
+	<beans:bean id="userpassFailureHandler"
+			class="org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler">
+		<beans:constructor-arg value="/login?error" />
+	</beans:bean>
 	<!-- End Spring Security Beans -->
 
 	<!-- Spring Security OTP -->
-	<!-- Filter checks username, password, and OTP token for validity -->
-	<beans:bean id="otpUsernamePasswordAuthFilter"
-		class="com.upcrob.springsecurity.otp.OtpAuthenticationFilter">
-		<beans:constructor-arg name="tokenStore" ref="localTokenstore" />
-		<beans:property name="authenticationManager" ref="authenticationManager" />
-		<beans:property name="usernameParameter" value="username" />
-		<beans:property name="passwordParameter" value="password" />
+
+	<!-- Validation filter definition -->
+	<beans:bean id="otpValidationFilter"
+		class="com.upcrob.springsecurity.otp.OtpValidationFilter">
+		<beans:constructor-arg name="tokenstore" ref="localTokenstore" />
+		<beans:constructor-arg name="endpoint" value="/validate" />
+		<beans:constructor-arg name="successUrl" value="private" />
+		<beans:constructor-arg name="failureUrl" value="login?error" />
 	</beans:bean>
+
+	<!-- OTP wrapper authentication provider - wraps the primary authentication 
+		provider -->
+	<beans:bean id="otpGeneratingAuthenticationProvider"
+		class="com.upcrob.springsecurity.otp.OtpGeneratingAuthenticationProvider">
+		<beans:constructor-arg name="provider"
+			ref="dummyAuthenticationProvider" />
+		<beans:constructor-arg name="tokenstore" ref="localTokenstore" />
+		<beans:constructor-arg name="lookupStrategy"
+			ref="dummyLookupStrategy" />
+		<beans:constructor-arg name="sendStrategy" ref="emailSendStrategy" />
+	</beans:bean>
+
+	<!-- Dummy in-memory authentication provider that recognizes a user called 
+		'testuser' with password, 'testpassword' -->
+	<beans:bean id="dummyAuthenticationProvider"
+		class="com.upcrob.springsecurity.example.DummyAuthenticationProvider" />
 
 	<!-- In-memory tokenstore (not for production) that stores generates tokens 
 		and treats them as valid for 60 seconds following creation -->
@@ -59,16 +92,17 @@
 		class="com.upcrob.springsecurity.example.DummyLookupStrategy">
 		<beans:property name="users" ref="userMap" />
 	</beans:bean>
-	<beans:bean id="userMap" class="org.springframework.beans.factory.config.MapFactoryBean">
+	<beans:bean id="userMap"
+		class="org.springframework.beans.factory.config.MapFactoryBean">
 		<beans:property name="sourceMap">
 			<beans:map>
 				<beans:entry key="testuser" value="[TEST USER EMAIL]" />
 			</beans:map>
 		</beans:property>
 	</beans:bean>
-	
-	<!-- Method by which OTP tokens should be sent.  We'll use email for this
-		example.  The server, port and TLS properties are currently setup for gmail,
+
+	<!-- Method by which OTP tokens should be sent. We'll use email for this 
+		example. The server, port and TLS properties are currently setup for gmail, 
 		but need to be configured differently if a different provider is being used. -->
 	<beans:bean id="emailSendStrategy"
 		class="com.upcrob.springsecurity.otp.EmailSendStrategy">
@@ -78,16 +112,6 @@
 		<beans:property name="useTls" value="true" />
 		<beans:property name="username" value="[SENDER ACCOUNT USERNAME]" />
 		<beans:property name="password" value="[SENDER ACCOUNT PASSWORD]" />
-	</beans:bean>
-	
-	<!-- Filter that listens for requests to send OTP tokens to users -->
-	<beans:bean id="otpGenerationFilter"
-		class="com.upcrob.springsecurity.otp.OtpGenerationFilter">
-		<beans:constructor-arg name="tokenStore" ref="localTokenstore" />
-		<beans:constructor-arg name="lookupStrategy" ref="dummyLookupStrategy" />
-		<beans:constructor-arg name="sendStrategy" ref="emailSendStrategy" />
-		<beans:constructor-arg name="endpoint" value="/generatetoken" />
-		<beans:property name="usernameParameter" value="username" />
 	</beans:bean>
 	<!-- End Spring Security OTP -->
 </beans:beans>

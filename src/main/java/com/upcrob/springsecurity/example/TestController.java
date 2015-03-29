@@ -31,4 +31,11 @@ public class TestController {
 		model.setViewName("login");
 		return model;
 	}
+	
+	@RequestMapping(value = "/otpentry", method = RequestMethod.GET)
+	public ModelAndView otpEntryPage() {
+		ModelAndView model = new ModelAndView();
+		model.setViewName("otpentry");
+		return model;
+	}
 }
